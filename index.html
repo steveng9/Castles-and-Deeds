@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Castles &amp; Deeds</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+
+  <!-- Core engine -->
+  <script type="text/javascript" src="./js/core/Constants.js"></script>
+  <script type="text/javascript" src="./js/core/Camera.js"></script>
+  <script type="text/javascript" src="./js/core/GameEngine.js"></script>
+
+  <!-- Rules / data (view-free) -->
+  <script type="text/javascript" src="./js/rules/GameConfig.js"></script>
+  <script type="text/javascript" src="./js/rules/GameState.js"></script>
+
+  <!-- Board + pieces (BoardGenerator defines RNG, used by movement + scenario) -->
+  <script type="text/javascript" src="./js/board/BoardGenerator.js"></script>
+  <script type="text/javascript" src="./js/board/BoardRenderer.js"></script>
+  <script type="text/javascript" src="./js/pieces/PieceRenderer.js"></script>
+
+  <!-- Movement (SWAPPABLE rules) + turn/economy + test fixture -->
+  <script type="text/javascript" src="./js/rules/movement/TendencyMovementV1.js"></script>
+  <script type="text/javascript" src="./js/rules/TurnManager.js"></script>
+  <script type="text/javascript" src="./js/rules/DebugScenario.js"></script>
+
+  <!-- Multiplayer (loaded before SceneManager that references NetworkManager) -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script type="text/javascript" src="./js/core/NetworkManager.js"></script>
+
+  <!-- Scenes + router (loaded after all entity/renderer classes) -->
+  <script type="text/javascript" src="./js/scenes/SetupScene.js"></script>
+  <script type="text/javascript" src="./js/scenes/PlayScene.js"></script>
+  <script type="text/javascript" src="./js/core/SceneManager.js"></script>
+
+  <!-- Bootstrap -->
+  <script type="text/javascript" src="./js/Main.js"></script>
+</head>
+
+<body>
+  <div class="grid-container">
+    <div class="stage">
+      <canvas id="gameWorld" tabindex="1" width="1133" height="700"
+              style="border: 1px solid #333; background: #1b1f1b"></canvas>
+
+      <!-- Board-master controls (dimensions). Action buttons live on-canvas. -->
+      <div class="board-controls">
+        <span class="bc-title">CASTLES &amp; DEEDS — Board Master</span>
+        <label>Cols <input type="number" id="boardCols" min="4" max="60" value="16"></label>
+        <label>Rows <input type="number" id="boardRows" min="4" max="60" value="12"></label>
+        <span class="bc-hint">Edit dimensions, then click <b>Regenerate</b> on the canvas palette.</span>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

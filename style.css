@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css?family=VT323|Poiret+One');
+
+body {
+  background-color: rgb(27, 31, 27);
+  font-family: 'VT323', monospace;
+  color: #e6e6e6;
+  margin: 0;
+}
+
+canvas {
+  padding: 0;
+  margin: auto;
+  display: block;
+  cursor: crosshair;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: auto;
+  grid-gap: 10px;
+  padding: 10px;
+}
+
+.stage {
+  margin: auto;
+  position: relative;
+}
+
+/* Board-master dimension controls under the canvas */
+.board-controls {
+  font-family: 'VT323', monospace;
+  color: #cfd6cf;
+  padding: 10px 4px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.board-controls .bc-title {
+  color: #9fe6b0;
+  font-size: 22px;
+  letter-spacing: 2px;
+}
+
+.board-controls .bc-hint {
+  color: #888;
+  font-size: 16px;
+}
+
+.board-controls label { cursor: text; }
+
+.board-controls input[type="number"] {
+  background: #111;
+  border: 1px solid #3a3a3a;
+  color: #fff;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  width: 56px;
+  padding: 3px 6px;
+  text-align: center;
+}

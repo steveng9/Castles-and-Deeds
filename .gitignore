@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+
+# Temp verification artifacts (headless-Chrome screenshots/logs live in /tmp)
+_probe.html
