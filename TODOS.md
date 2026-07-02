@@ -157,6 +157,7 @@ the model tracks ownership/yield. Helps the "always something to play for" goal
 - [ ] Terrain swatch labels are truncated ("Plai", "Moun"); show full names or tooltips.
 - [ ] Keyboard shortcuts for tools (1/2/3 = Place/Paint/Erase, Tab = cycle player).
 - [ ] Show a starting-army tray (counts per `GameConfig.pieces[*].perPlayer`) so the board master can place full sets quickly.
+- [ ] Smooth piece movement transitions: once a player commits a move, animate pieces sliding to their new cells (don't snap), so other players get a small window to *see* which pieces on the board are shifting. (Tempo + readability; ties to the "masses reshape" feel in L2 and the multiplayer reveal in L8.)
 
 ---
 

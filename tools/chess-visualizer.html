@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chess Movement Visualizer</title>
+<style>
+  :root{
+    --light:#e9c99c;        /* tan */
+    --dark:#8a5a36;         /* dark brown */
+    --hl1:rgba(46,170,72,0.90);   /* first-move (quiet) */
+    --hlcap:rgba(220,55,40,0.55); /* first-move capture */
+    --hl2:rgba(60,120,225,0.34);  /* second-move only */
+    --sel:#ffd23f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:#23211e; color:#e8e2d6;
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    display:flex; flex-direction:column; align-items:center; padding:22px 14px 60px;
+    -webkit-user-select:none; user-select:none;
+  }
+  h1{font-size:18px; font-weight:600; margin:0 0 4px; letter-spacing:.3px;}
+  .sub{font-size:12.5px; color:#a59f93; margin:0 0 16px; max-width:640px; text-align:center; line-height:1.5;}
+
+  .controls{display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; justify-content:center; margin-bottom:14px;}
+  .controls label{display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;}
+  button{
+    font:inherit; font-size:13px; padding:6px 12px; border-radius:7px; cursor:pointer;
+    background:#3a3631; color:#e8e2d6; border:1px solid #524c44;
+  }
+  button:hover{background:#46413a;}
+  button.danger{background:#5a2b25; border-color:#7a3a30;}
+  button.danger:hover{background:#6e342c;}
+
+  #board{
+    position:relative; width:512px; height:512px;
+    display:grid; grid-template-columns:repeat(8,1fr); grid-template-rows:repeat(8,1fr);
+    border:6px solid #2c2926; border-radius:4px; box-shadow:0 10px 40px rgba(0,0,0,.5);
+    touch-action:none;
+  }
+  .sq{position:relative; display:flex; align-items:center; justify-content:center;}
+  .sq.light{background:var(--light);}
+  .sq.dark{background:var(--dark);}
+  .sq::before{content:''; position:absolute; inset:0; pointer-events:none; z-index:1;}
+  .sq.hl1::before{background:var(--hl1);}
+  .sq.hlcap::before{background:var(--hlcap);
+    box-shadow:inset 0 0 0 4px rgba(220,55,40,0.85);}
+  .sq.hl2::before{background:var(--hl2);}
+  .sq.sel{outline:3px solid var(--sel); outline-offset:-3px; z-index:3;}
+  .sq .coord{position:absolute; bottom:1px; right:3px; font-size:9px; color:rgba(0,0,0,.30); z-index:1;}
+  .sq.dark .coord{color:rgba(255,255,255,.30);}
+
+  .piece{
+    position:relative; z-index:2; font-size:50px; line-height:1; cursor:grab;
+    pointer-events:none; /* clicks resolve to the square; we hit-test by math */
+  }
+  .piece.w{color:#fcfbf7; -webkit-text-stroke:1.6px #2a2a2a; text-shadow:0 1px 1px rgba(0,0,0,.35);}
+  .piece.b{color:#2a2622; -webkit-text-stroke:1.6px #050505; text-shadow:0 1px 1px rgba(0,0,0,.25);}
+
+  .palette{margin-top:20px; display:flex; flex-direction:column; gap:8px; align-items:center;}
+  .palrow{display:flex; gap:6px;}
+  .palcell{
+    width:58px; height:58px; display:flex; align-items:center; justify-content:center;
+    background:#39342e; border:1px solid #4f4941; border-radius:8px; cursor:grab;
+  }
+  .palcell:hover{background:#433d35;}
+  .palcell .piece{font-size:44px; cursor:grab;}
+  .palhint{font-size:11.5px; color:#8d877c;}
+
+  #ghost{position:fixed; z-index:1000; pointer-events:none; font-size:50px; line-height:1;
+    transform:translate(-50%,-50%); display:none;}
+  #ghost.w{color:#fcfbf7; -webkit-text-stroke:1.6px #2a2a2a;}
+  #ghost.b{color:#2a2622; -webkit-text-stroke:1.6px #050505;}
+  #selrect{position:fixed; z-index:999; border:1.5px dashed var(--sel);
+    background:rgba(255,210,63,0.12); pointer-events:none; display:none;}
+
+  .legend{display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:14px; font-size:12px; color:#b7b1a6;}
+  .legend i{display:inline-block; width:13px; height:13px; border-radius:3px; vertical-align:-2px; margin-right:5px;}
+</style>
+</head>
+<body>
+  <h1>Chess Movement Visualizer</h1>
+  <p class="sub">
+    Drag pieces from the tray onto the board. Drag a board piece off the board to delete it.
+    Shift-drag to box-select pieces, then Delete. Turn on highlighting and hover a piece to see
+    where it can move — optionally one move further (assuming the rest of the board stays still).
+  </p>
+
+  <div class="controls">
+    <label><input type="checkbox" id="showMoves" checked> Highlight moves on hover</label>
+    <label><input type="checkbox" id="show2"> Also show 2nd move</label>
+    <button id="btnStart">Starting position</button>
+    <button id="btnClear">Clear board</button>
+    <button id="btnDelete" class="danger">Delete selected</button>
+  </div>
+
+  <div id="board"></div>
+
+  <div class="palette">
+    <div class="palhint">Drag a piece onto the board</div>
+    <div class="palrow" id="palWhite"></div>
+    <div class="palrow" id="palBlack"></div>
+  </div>
+
+  <div class="legend">
+    <span><i style="background:rgba(46,170,72,.7)"></i>1st move</span>
+    <span><i style="background:rgba(220,55,40,.8)"></i>1st-move capture</span>
+    <span><i style="background:rgba(60,120,225,.55)"></i>2nd move only</span>
+  </div>
+
+  <div id="ghost"></div>
+  <div id="selrect"></div>
+
+<script>
+"use strict";
+
+// ---- model -------------------------------------------------------------
+// board[r][c] : null | {type:'k|q|r|b|n|p', color:'w|b'}.  row 0 = top (rank 8).
+const GLYPH = {k:'♚', q:'♛', r:'♜', b:'♝', n:'♞', p:'♟'};
+const ORDER = ['r','n','b','q','k','b','n','r'];
+let board = [];
+
+function emptyBoard(){ return Array.from({length:8}, ()=>Array(8).fill(null)); }
+function startPosition(){
+  const b = emptyBoard();
+  for(let c=0;c<8;c++){
+    b[0][c] = {type:ORDER[c], color:'b'};
+    b[1][c] = {type:'p', color:'b'};
+    b[6][c] = {type:'p', color:'w'};
+    b[7][c] = {type:ORDER[c], color:'w'};
+  }
+  return b;
+}
+const inb = (r,c)=> r>=0 && r<8 && c>=0 && c<8;
+const cloneBoard = b => b.map(row => row.map(p => p ? {type:p.type,color:p.color} : null));
+
+// ---- move generation (pseudo-legal; no check enforcement) --------------
+const DIRS = {
+  r:[[-1,0],[1,0],[0,-1],[0,1]],
+  b:[[-1,-1],[-1,1],[1,-1],[1,1]],
+  q:[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]],
+  k:[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]],
+  n:[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+};
+
+// Returns array of {r,c,capture,ep?,castle?}
+function genMoves(bd, r, c){
+  const p = bd[r][c];
+  if(!p) return [];
+  const out = [];
+  const friend = (rr,cc)=> bd[rr][cc] && bd[rr][cc].color === p.color;
+
+  if(p.type === 'p'){
+    const dir = p.color === 'w' ? -1 : 1;
+    const startRow = p.color === 'w' ? 6 : 1;
+    // forward one / two
+    if(inb(r+dir,c) && !bd[r+dir][c]){
+      out.push({r:r+dir, c, capture:false});
+      if(r === startRow && !bd[r+2*dir][c]) out.push({r:r+2*dir, c, capture:false});
+    }
+    // diagonal captures + en-passant heuristic
+    const epRow = p.color === 'w' ? 3 : 4; // rank from which e.p. is possible
+    for(const dc of [-1,1]){
+      const rr = r+dir, cc = c+dc;
+      if(!inb(rr,cc)) continue;
+      const t = bd[rr][cc];
+      if(t && t.color !== p.color){ out.push({r:rr, c:cc, capture:true}); }
+      else if(!t && r === epRow){
+        const side = bd[r][cc]; // pawn that (hypothetically) just double-stepped
+        if(side && side.type === 'p' && side.color !== p.color)
+          out.push({r:rr, c:cc, capture:true, ep:true});
+      }
+    }
+    return out;
+  }
+
+  if(p.type === 'n' || p.type === 'k'){
+    for(const [dr,dc] of DIRS[p.type]){
+      const rr=r+dr, cc=c+dc;
+      if(!inb(rr,cc) || friend(rr,cc)) continue;
+      out.push({r:rr, c:cc, capture: !!bd[rr][cc]});
+    }
+    if(p.type === 'k'){
+      const home = p.color === 'w' ? 7 : 0;
+      if(r === home && c === 4){
+        const rk = bd[home][7];
+        if(rk && rk.type==='r' && rk.color===p.color && !bd[home][5] && !bd[home][6])
+          out.push({r:home, c:6, capture:false, castle:true});
+        const rq = bd[home][0];
+        if(rq && rq.type==='r' && rq.color===p.color && !bd[home][1] && !bd[home][2] && !bd[home][3])
+          out.push({r:home, c:2, capture:false, castle:true});
+      }
+    }
+    return out;
+  }
+
+  // sliders: r, b, q
+  for(const [dr,dc] of DIRS[p.type]){
+    let rr=r+dr, cc=c+dc;
+    while(inb(rr,cc)){
+      const t = bd[rr][cc];
+      if(!t){ out.push({r:rr, c:cc, capture:false}); }
+      else { if(t.color !== p.color) out.push({r:rr, c:cc, capture:true}); break; }
+      rr+=dr; cc+=dc;
+    }
+  }
+  return out;
+}
+
+// All squares reachable on a *second* move, assuming the rest of the board is frozen.
+function secondMoves(r, c){
+  const p = board[r][c];
+  const first = genMoves(board, r, c);
+  const second = new Map();
+  for(const m of first){
+    const bd = cloneBoard(board);
+    bd[r][c] = null;
+    if(m.ep) bd[r][m.c] = null;                 // remove e.p.-captured pawn
+    bd[m.r][m.c] = {type:p.type, color:p.color}; // piece now sits on m
+    for(const n of genMoves(bd, m.r, m.c)) second.set(n.r+','+n.c, n);
+  }
+  return second;
+}
+
+// ---- DOM / rendering ---------------------------------------------------
+const boardEl = document.getElementById('board');
+const ghostEl = document.getElementById('ghost');
+const selRectEl = document.getElementById('selrect');
+const squares = []; // squares[r][c] -> element
+let selected = new Set(); // "r,c"
+
+function buildBoard(){
+  boardEl.innerHTML = '';
+  for(let r=0;r<8;r++){
+    squares[r] = [];
+    for(let c=0;c<8;c++){
+      const sq = document.createElement('div');
+      sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
+      sq.dataset.r = r; sq.dataset.c = c;
+      if(c===0){ const lab=document.createElement('span'); lab.className='coord'; lab.textContent=8-r; sq.appendChild(lab); }
+      squares[r][c] = sq;
+      boardEl.appendChild(sq);
+    }
+  }
+}
+
+function render(){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const sq = squares[r][c];
+    const old = sq.querySelector('.piece');
+    if(old) old.remove();
+    const p = board[r][c];
+    if(p){
+      const span = document.createElement('span');
+      span.className = 'piece ' + p.color;
+      span.textContent = GLYPH[p.type];
+      sq.appendChild(span);
+    }
+    sq.classList.toggle('sel', selected.has(r+','+c));
+  }
+}
+
+function clearHighlights(){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    squares[r][c].classList.remove('hl1','hlcap','hl2');
+}
+
+function applyHover(r,c){
+  clearHighlights();
+  if(!document.getElementById('showMoves').checked) return;
+  if(!board[r][c]) return;
+  const first = genMoves(board, r, c);
+  const fkeys = new Set(first.map(m => m.r+','+m.c));
+  if(document.getElementById('show2').checked){
+    for(const [k,n] of secondMoves(r,c))
+      if(!fkeys.has(k)) squares[n.r][n.c].classList.add('hl2');
+  }
+  for(const m of first)
+    squares[m.r][m.c].classList.add(m.capture ? 'hlcap' : 'hl1');
+}
+
+// ---- pointer helpers ---------------------------------------------------
+function cellFromPoint(clientX, clientY){
+  const rect = boardEl.getBoundingClientRect();
+  const x = clientX - rect.left, y = clientY - rect.top;
+  if(x < 0 || y < 0 || x >= rect.width || y >= rect.height) return null;
+  return {r: Math.floor(y / (rect.height/8)), c: Math.floor(x / (rect.width/8))};
+}
+
+// ---- drag state --------------------------------------------------------
+let drag = null;     // {piece, fromR, fromC}  (from palette => fromR null)
+let select = null;   // {x0,y0}
+
+function startDrag(piece, fromR, fromC, e){
+  drag = {piece, fromR, fromC};
+  if(fromR !== null){ board[fromR][fromC] = null; render(); } // pick up
+  ghostEl.className = piece.color;
+  ghostEl.textContent = GLYPH[piece.type];
+  ghostEl.style.display = 'block';
+  moveGhost(e.clientX, e.clientY);
+  clearHighlights();
+}
+function moveGhost(x,y){ ghostEl.style.left = x+'px'; ghostEl.style.top = y+'px'; }
+
+// palette
+function buildPalette(){
+  const mk = (color, host)=>{
+    for(const type of ['k','q','r','b','n','p']){
+      const cell = document.createElement('div');
+      cell.className = 'palcell';
+      const span = document.createElement('span');
+      span.className = 'piece ' + color;
+      span.textContent = GLYPH[type];
+      cell.appendChild(span);
+      cell.addEventListener('mousedown', e=>{ e.preventDefault(); startDrag({type,color}, null, null, e); });
+      host.appendChild(cell);
+    }
+  };
+  mk('w', document.getElementById('palWhite'));
+  mk('b', document.getElementById('palBlack'));
+}
+
+// board interactions
+boardEl.addEventListener('mousedown', e=>{
+  const cell = cellFromPoint(e.clientX, e.clientY);
+  if(!cell) return;
+  e.preventDefault();
+  if(e.shiftKey){
+    select = {x0:e.clientX, y0:e.clientY};
+    selRectEl.style.display = 'block';
+    updateSelRect(e.clientX, e.clientY);
+    return;
+  }
+  // plain click clears any existing selection
+  if(selected.size){ selected.clear(); render(); }
+  const p = board[cell.r][cell.c];
+  if(p) startDrag(p, cell.r, cell.c, e);
+});
+
+let hoverKey = null;
+boardEl.addEventListener('mousemove', e=>{
+  if(drag || select) return;
+  const cell = cellFromPoint(e.clientX, e.clientY);
+  const key = cell ? cell.r+','+cell.c : null;
+  if(key !== hoverKey){
+    hoverKey = key;
+    if(cell) applyHover(cell.r, cell.c); else clearHighlights();
+  }
+});
+boardEl.addEventListener('mouseleave', ()=>{ if(!drag && !select){ hoverKey=null; clearHighlights(); } });
+
+document.addEventListener('mousemove', e=>{
+  if(drag) moveGhost(e.clientX, e.clientY);
+  else if(select) updateSelRect(e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseup', e=>{
+  if(drag){
+    const cell = cellFromPoint(e.clientX, e.clientY);
+    if(cell) board[cell.r][cell.c] = {type:drag.piece.type, color:drag.piece.color};
+    // dropped off-board: if it came from the board it is simply gone (deleted)
+    drag = null;
+    ghostEl.style.display = 'none';
+    render();
+  } else if(select){
+    finalizeSelection();
+    select = null;
+    selRectEl.style.display = 'none';
+  }
+});
+
+// ---- box selection -----------------------------------------------------
+function updateSelRect(x,y){
+  const x0 = Math.min(select.x0, x), y0 = Math.min(select.y0, y);
+  const w = Math.abs(x - select.x0), h = Math.abs(y - select.y0);
+  selRectEl.style.left = x0+'px'; selRectEl.style.top = y0+'px';
+  selRectEl.style.width = w+'px'; selRectEl.style.height = h+'px';
+}
+function finalizeSelection(){
+  const rect = selRectEl.getBoundingClientRect();
+  selected.clear();
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    if(!board[r][c]) continue;
+    const sr = squares[r][c].getBoundingClientRect();
+    const hit = !(sr.right < rect.left || sr.left > rect.right || sr.bottom < rect.top || sr.top > rect.bottom);
+    if(hit) selected.add(r+','+c);
+  }
+  render();
+}
+function deleteSelected(){
+  if(!selected.size) return;
+  for(const key of selected){ const [r,c] = key.split(',').map(Number); board[r][c] = null; }
+  selected.clear();
+  render();
+}
+
+// ---- controls ----------------------------------------------------------
+document.getElementById('btnStart').addEventListener('click', ()=>{ board = startPosition(); selected.clear(); render(); });
+document.getElementById('btnClear').addEventListener('click', ()=>{ board = emptyBoard(); selected.clear(); render(); });
+document.getElementById('btnDelete').addEventListener('click', deleteSelected);
+document.addEventListener('keydown', e=>{
+  if((e.key === 'Delete' || e.key === 'Backspace') && selected.size){ e.preventDefault(); deleteSelected(); }
+});
+
+// ---- boot --------------------------------------------------------------
+buildBoard();
+buildPalette();
+board = startPosition();
+render();
+console.log('Chess Movement Visualizer running');
+</script>
+</body>
+</html>
